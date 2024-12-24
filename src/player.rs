@@ -56,8 +56,8 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_knight)
             .add_plugins(PanOrbitCameraPlugin)
-            // .add_computed_state::<JUMPING>()
-            .add_systems(Update, (spawn_animation, moving_knight, setup_moving_animation, display_events))
+            .add_systems(Update, (spawn_animation, moving_knight, setup_moving_animation))
+            .add_systems(PostUpdate, (display_events))
         ;
     }
 }
@@ -77,7 +77,7 @@ fn setup_knight(
     let mut knight_command = commands.spawn((
         PlayerMark,
         player,
-        Transform::from_xyz(0f32, 200.0, 0f32),
+        Transform::from_xyz(0f32, 20.0, 0f32),
         Collider::round_cylinder(knight_height / 2f32, 0.4, 0.4),
         ColliderDebugColor(Hsla::from(PLUM)),
         ActiveEvents::COLLISION_EVENTS,
@@ -85,7 +85,7 @@ fn setup_knight(
         KinematicCharacterController {
             custom_mass: Some(5.0),
             up: Vec3::Y,
-            offset: CharacterLength::Relative(0.1),
+            offset: CharacterLength::Relative(0.01),
             slide: true,
             autostep: Some(CharacterAutostep {
                 max_height: CharacterLength::Relative(0.4),
