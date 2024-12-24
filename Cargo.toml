@@ -1,0 +1,16 @@
+[package]
+name = "parkour"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = { version = "0.15" }
+bevy_rapier3d = { version = "0.28", features = [ "simd-stable", "debug-render-3d"] }
+rand = "0.8"
+bevy_panorbit_camera = "0.21"
+bevy_egui = "0.31"
+bevy-inspector-egui = "0.28"
+nalgebra = "0.33"
+
+[target.wasm32-unknown-unknown]
+runner = "wasm-server-runner"
