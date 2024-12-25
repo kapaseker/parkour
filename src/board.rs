@@ -25,8 +25,8 @@ pub struct BarrierScene {
     cactus: Handle<Scene>,
 }
 
-#[derive(Resource)]
-pub struct PlaneResource(Entity);
+// #[derive(Resource)]
+// pub struct PlaneResource(Entity);
 
 impl Plugin for AppBoardPlugin {
     fn build(&self, app: &mut App) {
@@ -70,7 +70,7 @@ fn setup(
                     brick_command.with_children(|parent| {
                         parent.spawn(barrier_bundle).with_children(|parent| {
                             parent.spawn((
-                                Collider::cuboid(1.0, 1.5, 1.0),
+                                Collider::cuboid(0.8, 1.5, 0.8),
                                 Transform::from_xyz(0.0, 1.5, 0.0)
                             ));
                         });
@@ -85,25 +85,6 @@ fn setup(
                 });
             })
     });
-
-    // set up sensor plane
-    let plane = commands.spawn(
-        (
-            PlaneMark,
-            RigidBody::Fixed,
-            Collider::cuboid(5.0, 0.01, 5000.0),
-            Mesh3d(meshes.add(Cuboid::new(10.0, 0.02, 10000.0))),
-            MeshMaterial3d(materials.add(StandardMaterial {
-                base_color: RED.into(),
-                ..Default::default()
-            })),
-            Transform::from_xyz(0.0, 2.0, 0.0),
-            Sensor,
-            ColliderDebugColor(Hsla::from(SALMON)),
-        )
-    ).id();
-
-    commands.insert_resource::<PlaneResource>(PlaneResource(plane));
 }
 
 ///
@@ -116,13 +97,14 @@ fn lifecycle_board(
 ) {
 
     *life_delta += time.delta_secs();
+    //todo:要根据摄像头的位置实时计算砖块的移动
+    if *life_delta > 3.0 {
 
-    if *life_delta * RUNNING_SPEED > BRICK_SIZE {
-        brick_query.iter_mut().sort_by::<&Transform>(|&a, &b| {
-            b.translation.z.partial_cmp(&a.translation.z).unwrap()
-        }).take(3).for_each(|mut brick| {
+        brick_query.iter_mut().filter(|brick| {
+            brick.translation.z > BOARD_Z_OFFSET as f32
+        }).for_each(|mut brick| {
             let height = random_height();
-            brick.translation.z -= BOARD_COUNT_Z as f32 * BRICK_SIZE;
+            brick.translation.z -= BOARD_COUNT_Z as f32 * BOARD_SIZE;
             brick.translation.y = height;
         });
 
@@ -131,12 +113,12 @@ fn lifecycle_board(
 }
 
 fn random_height() -> f32 {
-    rand::thread_rng().gen_range(-BRICK_HEIGHT_RANDOM..BRICK_HEIGHT_RANDOM) - BRICK_HEIGHT_RANDOM
+    rand::thread_rng().gen_range(-BOARD_HEIGHT_RANDOM..BOARD_HEIGHT_RANDOM) - BOARD_HEIGHT_RANDOM
 }
 
 fn random_barrier() -> bool {
-    false
-    // rand::thread_rng().gen_bool(0.1f64)
+    // false
+    rand::thread_rng().gen_bool(0.1f64)
 }
 
 fn random_planet() -> bool {

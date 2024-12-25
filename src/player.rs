@@ -1,4 +1,5 @@
-use crate::constant::{BOARD_COUNT_X, BRICK_SIZE, GRAVITY, MOVING_SPEED_H, PLAYER_Y, RUNNING_SPEED};
+use std::cmp::PartialEq;
+use crate::constant::{BOARD_COUNT_X, BOARD_SIZE, GRAVITY, GROUND_CHECKER_TIMER, MOVING_H_TIME, MOVING_SPEED_H, PLAYER_Y, RUNNING_SPEED};
 use bevy::asset::Handle;
 use bevy::color::palettes::css::{PERU, PLUM};
 use bevy::input::common_conditions::input_just_pressed;
@@ -22,19 +23,35 @@ pub struct PlayerPlugin;
 #[derive(Component)]
 pub struct PlayerMark;
 
-#[derive(Component)]
-pub struct Player {
-    jump_speed: f32,
-    y: f32,
-    jumping: bool,
+
+///移动的方向
+#[derive(Eq, PartialEq)]
+enum Direction {
+    LEFT,
+    RIGHT,
+    UP,
+    NONE
 }
 
-impl Default for Player {
+
+#[derive(Component)]
+pub struct Knight {
+    moving_direction: Direction,
+    up_speed: f32,
+    on_ground: bool,
+    /// lane >= -[BOARD_COUNT_X] and lane <= [BOARD_COUNT_X]
+    lane : i32,
+    target_lane: i32,
+}
+
+impl Default for Knight {
     fn default() -> Self {
         Self {
-            jump_speed: 0f32,
-            y: PLAYER_Y,
-            jumping: false,
+            moving_direction: Direction::NONE,
+            up_speed:0.0,
+            on_ground: false,
+            lane: 0,
+            target_lane: 0,
         }
     }
 }
@@ -56,7 +73,8 @@ impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_knight)
             .add_plugins(PanOrbitCameraPlugin)
-            .add_systems(Update, (spawn_animation, moving_knight, setup_moving_animation))
+            .add_systems(Update, (spawn_animation, setup_moving_animation))
+            .add_systems(FixedUpdate, (check_moving_event, moving_knight).chain())
             .add_systems(PostUpdate, (display_events))
         ;
     }
@@ -69,8 +87,7 @@ fn setup_knight(
 
     let knight_scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/player/knight.glb"));
 
-    let player = Player::default();
-    let y = player.y;
+    let player = Knight::default();
 
     let knight_height = 1.3;
 
@@ -183,67 +200,183 @@ fn spawn_animation(
     }
 }
 
+fn  check_moving_event(
+    time: Res<Time>,
+    mut knight: Query<(&mut Knight, Option<&KinematicCharacterControllerOutput>),With<PlayerMark>, >,
+    keyboard: Res<ButtonInput<KeyCode>>,
+    mut grounded_timer: Local<f32>,
+) {
+    let _ = knight.get_single_mut().map(|(mut knight, output)| {
+
+        let mut jump = false;
+
+        if knight.moving_direction == Direction::NONE {
+            if keyboard.just_pressed(KeyCode::Space) {
+                jump = true;
+            } else if keyboard.just_pressed(KeyCode::ArrowLeft) {
+                if knight.target_lane == knight.lane && knight.lane > -BOARD_COUNT_X {
+                    knight.target_lane -= 1;
+                    knight.moving_direction = Direction::LEFT;
+                    info!("moving left");
+                }
+            } else if keyboard.just_pressed(KeyCode::ArrowRight) {
+                if knight.target_lane == knight.lane && knight.lane < BOARD_COUNT_X {
+                    knight.target_lane += 1;
+                    knight.moving_direction = Direction::RIGHT;
+                    info!("moving right");
+                }
+            }
+        }
+
+        if output.map(|output| output.grounded).unwrap_or(false) {
+            *grounded_timer = GROUND_CHECKER_TIMER;
+            knight.up_speed = 0.0;
+            if knight.moving_direction == Direction::UP {
+                knight.moving_direction = Direction::NONE;
+            }
+        }
+
+        if *grounded_timer > 0.0 {
+            *grounded_timer -= time.delta_secs();
+            if jump {
+                knight.up_speed = 20.0;
+                *grounded_timer = 0.0;
+                knight.moving_direction = Direction::UP;
+            }
+        }
+    });
+}
+
+
 fn moving_knight(
     mut commands: Commands,
     time: Res<Time>,
-    mut knight: Query<(
+    mut knight_query: Query<(
+        &mut Knight,
         &mut Transform,
         &mut KinematicCharacterController,
         Option<&KinematicCharacterControllerOutput>,
     ), With<PlayerMark>>,
-    keyboard: Res<ButtonInput<KeyCode>>,
-    mut moving_z: Local<f32>,
-    mut vertical_movement: Local<f32>,
-    mut horizontal_movement: Local<f32>,
+    mut target_moving_x: Local<f32>,
+    mut start_moving_x: Local<bool>,
 ) {
 
-    let _ = knight.get_single_mut().and_then(|kn| {
+    let _ = knight_query.get_single_mut().map(|kn| {
 
         let delta = time.delta_secs();
 
-        *moving_z = delta * -RUNNING_SPEED;
+        let (mut knight, mut transform, mut controller, output) = kn;
 
-        let (mut transform, mut controller, output) = kn;
+        let mut moving_y = 0.0;
 
-        let moving_y = *vertical_movement * delta;
+        let mut moving_x = 0.0;
 
-        output.map(|output| {
-            info!("collision size: {}", &output.collisions.len());
-            // for collision in &output.collisions {
-            //
-            // }
-        });
-
-        if output.map(|o| o.grounded).unwrap_or(false) {
-
-            *vertical_movement = 0.0;
-
-            //跳跃
-            if keyboard.just_pressed(KeyCode::Space) && *horizontal_movement == 0.0 {
-                *vertical_movement = 20.0;
-            }
-
-            if *vertical_movement == 0.0 {
-
-                if keyboard.just_pressed(KeyCode::ArrowLeft) {
-                    if transform.translation.x > -BRICK_SIZE * (BOARD_COUNT_X as f32) {
-                        transform.translation.x -= BRICK_SIZE;
-                    }
-                }
-
-                if keyboard.just_pressed(KeyCode::ArrowRight) {
-                    if transform.translation.x < BRICK_SIZE * (BOARD_COUNT_X as f32) {
-                        transform.translation.x += BRICK_SIZE;
-                    }
-                }
-            }
-
-        } else {
-            *vertical_movement += GRAVITY * delta * controller.custom_mass.unwrap_or(1.0);
+        if knight.target_lane != knight.lane {
+            moving_x = (knight.target_lane - knight.lane).signum() as f32 * MOVING_SPEED_H * delta;
         }
 
-        controller.translation = Some(Vec3::new(0.0, moving_y, *moving_z));
-        Ok(())
+        let snap_to_right_place = ((moving_x > 0.0) && ((knight.target_lane as f32) * BOARD_SIZE > transform.translation.x)) || ((moving_x < 0.0) && ((knight.target_lane as f32) * BOARD_SIZE < transform.translation.x));
+
+        if snap_to_right_place {
+            info!("moving end");
+            knight.lane = knight.target_lane;
+            transform.translation.x = (knight.target_lane as f32) * BOARD_SIZE;
+            knight.moving_direction = Direction::NONE;
+            moving_x = 0.0;
+        }
+
+        // match knight.moving_direction {
+        //
+        //     Direction::LEFT => {
+        //
+        //         if transform.translation.x > -BOARD_SIZE * (BOARD_COUNT_X as f32) && !*start_moving_x {
+        //             *start_moving_x = true;
+        //             *target_moving_x = transform.translation.x - BOARD_SIZE;
+        //         }
+        //
+        //         if *start_moving_x {
+        //             moving_x = -MOVING_SPEED_H * delta;
+        //         }
+        //
+        //         info!("moving_x: {}", moving_x);
+        //
+        //         if transform.translation.x <= *target_moving_x {
+        //             *start_moving_x = false;
+        //             knight.moving_direction = Direction::NONE;
+        //             transform.translation.x = *target_moving_x;
+        //             moving_x = 0.0;
+        //
+        //             info!("end moving");
+        //         }
+        //     }
+        //
+        //     Direction::RIGHT => {
+        //
+        //         if transform.translation.x < BOARD_SIZE * (BOARD_COUNT_X as f32) && !*start_moving_x {
+        //             *start_moving_x = true;
+        //             *target_moving_x = transform.translation.x + BOARD_SIZE;
+        //         }
+        //
+        //         if *start_moving_x {
+        //             moving_x = MOVING_SPEED_H * delta;
+        //         }
+        //
+        //         info!("moving_x: {}", moving_x);
+        //
+        //         if transform.translation.x >= *target_moving_x {
+        //             *start_moving_x = false;
+        //             knight.moving_direction = Direction::NONE;
+        //             transform.translation.x = *target_moving_x;
+        //             moving_x = 0.0;
+        //
+        //             info!("end moving");
+        //         }
+        //     }
+        //
+        //     Direction::UP => {
+        //
+        //
+        //
+        //     }
+        //
+        //     Direction::NONE => {
+        //
+        //     }
+        // }
+
+        // match knight.moving_direction {
+        //     Direction::LEFT | Direction::RIGHT => {
+        //
+        //         if !*start_moving_x {
+        //             *start_moving_x = true;
+        //             *target_moving_x = BOARD_SIZE;
+        //             info!("start moving");
+        //         }
+        //
+        //         if *start_moving_x {
+        //
+        //             let last_target = *target_moving_x;
+        //
+        //             *target_moving_x -= moving_x.abs();
+        //
+        //             if *target_moving_x <= 0.0 {
+        //                 *start_moving_x = false;
+        //                 *target_moving_x = 0.0;
+        //                 moving_x = moving_x.signum() * last_target;
+        //                 knight.moving_direction = Direction::NONE;
+        //                 info!("left moving: {}", moving_x);
+        //             }
+        //         }
+        //     }
+        //     _ => {}
+        // }
+        //
+        // info!("translation X: {:?}", transform.translation.x);
+
+        moving_y = knight.up_speed * delta;
+        knight.up_speed += GRAVITY * delta * controller.custom_mass.unwrap_or(1.0);
+
+        controller.translation = Some(Vec3::new(moving_x, moving_y, delta * -RUNNING_SPEED));
     });
 }
 
