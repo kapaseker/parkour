@@ -1,10 +1,10 @@
+use crate::constant::*;
+use crate::player::KnightMark;
 use bevy::app::App;
-use bevy::color::palettes::basic::RED;
-use bevy::color::palettes::css::{PERU, SALMON};
 use bevy::prelude::*;
 use bevy_rapier3d::prelude::*;
 use rand::Rng;
-use crate::constant::*;
+use std::time::Duration;
 
 pub struct AppBoardPlugin;
 
@@ -25,12 +25,15 @@ pub struct BarrierScene {
     cactus: Handle<Scene>,
 }
 
+#[derive(Resource)]
+pub struct BoardLifeTimer(Timer);
+
 // #[derive(Resource)]
 // pub struct PlaneResource(Entity);
 
 impl Plugin for AppBoardPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup).add_systems(Update, (lifecycle_board));
+        app.add_systems(Startup, setup).add_systems(Update, (lifecycle_board)).insert_resource(BoardLifeTimer(Timer::new(Duration::from_secs(3), TimerMode::Repeating)));
     }
 }
 
@@ -91,24 +94,28 @@ fn setup(
 /// 每隔一段时间，后面需要消去的砖块，移动到前面，嘻嘻嘻
 ///
 fn lifecycle_board(
-    mut life_delta: Local<f32>,
-    time: Res<Time>,
-    mut brick_query: Query<&mut Transform, With<Brick>>,
+    time:Res<Time>,
+    mut life_timer: ResMut<BoardLifeTimer>,
+    mut player_brick_query: ParamSet<(Query<&Transform, With<KnightMark>>, Query<&mut Transform, With<Brick>>)>,
 ) {
 
-    *life_delta += time.delta_secs();
-    //todo:要根据摄像头的位置实时计算砖块的移动
-    if *life_delta > 3.0 {
+    if life_timer.0.tick(time.delta()).just_finished() {
 
-        brick_query.iter_mut().filter(|brick| {
-            brick.translation.z > BOARD_Z_OFFSET as f32
-        }).for_each(|mut brick| {
-            let height = random_height();
-            brick.translation.z -= BOARD_COUNT_Z as f32 * BOARD_SIZE;
-            brick.translation.y = height;
-        });
+        let knight_query = player_brick_query.p0();
 
-        *life_delta = 0f32;
+        if let Ok(&knight) = knight_query.get_single() {
+
+            let knight_z = knight.translation.z;
+
+            let mut brick_query = player_brick_query.p1();
+            brick_query.iter_mut().filter(|brick| {
+                brick.translation.z > (BOARD_Z_OFFSET as f32 + knight_z)
+            }).for_each(|mut brick| {
+                let height = random_height();
+                brick.translation.z -= BOARD_COUNT_Z as f32 * BOARD_SIZE;
+                brick.translation.y = height;
+            });
+        }
     }
 }
 

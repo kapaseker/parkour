@@ -18,11 +18,10 @@ pub struct MainCamera;
 
 const JUMP_SPEED: f32 = 12f32;
 
-pub struct PlayerPlugin;
+pub struct KnightPlugin;
 
 #[derive(Component)]
-pub struct PlayerMark;
-
+pub struct KnightMark;
 
 ///移动的方向
 #[derive(Eq, PartialEq)]
@@ -69,7 +68,7 @@ struct KnightAnimations {
     graph: Handle<AnimationGraph>,
 }
 
-impl Plugin for PlayerPlugin {
+impl Plugin for KnightPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_knight)
             .add_plugins(PanOrbitCameraPlugin)
@@ -87,13 +86,13 @@ fn setup_knight(
 
     let knight_scene = asset_server.load(GltfAssetLabel::Scene(0).from_asset("models/player/knight.glb"));
 
-    let player = Knight::default();
+    let knight_player = Knight::default();
 
     let knight_height = 1.3;
 
     let mut knight_command = commands.spawn((
-        PlayerMark,
-        player,
+        KnightMark,
+        knight_player,
         Transform::from_xyz(0f32, 20.0, 0f32),
         Collider::round_cylinder(knight_height / 2f32, 0.4, 0.4),
         ColliderDebugColor(Hsla::from(PLUM)),
@@ -130,7 +129,6 @@ fn setup_knight(
             Camera3d::default(),
             Transform::from_xyz(0.0, 10.0, 20.0).looking_at(Vec3::ZERO, Vec3::Y),
             PanOrbitCamera::default(),
-            // Transform::from_xyz(12.0, 2.0, 0.0).looking_at(Vec3::ZERO, Vec3::Y)
         ));
     });
 }
@@ -202,7 +200,7 @@ fn spawn_animation(
 
 fn  check_moving_event(
     time: Res<Time>,
-    mut knight: Query<(&mut Knight, Option<&KinematicCharacterControllerOutput>),With<PlayerMark>, >,
+    mut knight: Query<(&mut Knight, Option<&KinematicCharacterControllerOutput>),With<KnightMark>, >,
     keyboard: Res<ButtonInput<KeyCode>>,
     mut grounded_timer: Local<f32>,
 ) {
@@ -249,16 +247,13 @@ fn  check_moving_event(
 
 
 fn moving_knight(
-    mut commands: Commands,
     time: Res<Time>,
     mut knight_query: Query<(
         &mut Knight,
         &mut Transform,
         &mut KinematicCharacterController,
         Option<&KinematicCharacterControllerOutput>,
-    ), With<PlayerMark>>,
-    mut target_moving_x: Local<f32>,
-    mut start_moving_x: Local<bool>,
+    ), With<KnightMark>>,
 ) {
 
     let _ = knight_query.get_single_mut().map(|kn| {
@@ -284,94 +279,6 @@ fn moving_knight(
             knight.moving_direction = Direction::NONE;
             moving_x = 0.0;
         }
-
-        // match knight.moving_direction {
-        //
-        //     Direction::LEFT => {
-        //
-        //         if transform.translation.x > -BOARD_SIZE * (BOARD_COUNT_X as f32) && !*start_moving_x {
-        //             *start_moving_x = true;
-        //             *target_moving_x = transform.translation.x - BOARD_SIZE;
-        //         }
-        //
-        //         if *start_moving_x {
-        //             moving_x = -MOVING_SPEED_H * delta;
-        //         }
-        //
-        //         info!("moving_x: {}", moving_x);
-        //
-        //         if transform.translation.x <= *target_moving_x {
-        //             *start_moving_x = false;
-        //             knight.moving_direction = Direction::NONE;
-        //             transform.translation.x = *target_moving_x;
-        //             moving_x = 0.0;
-        //
-        //             info!("end moving");
-        //         }
-        //     }
-        //
-        //     Direction::RIGHT => {
-        //
-        //         if transform.translation.x < BOARD_SIZE * (BOARD_COUNT_X as f32) && !*start_moving_x {
-        //             *start_moving_x = true;
-        //             *target_moving_x = transform.translation.x + BOARD_SIZE;
-        //         }
-        //
-        //         if *start_moving_x {
-        //             moving_x = MOVING_SPEED_H * delta;
-        //         }
-        //
-        //         info!("moving_x: {}", moving_x);
-        //
-        //         if transform.translation.x >= *target_moving_x {
-        //             *start_moving_x = false;
-        //             knight.moving_direction = Direction::NONE;
-        //             transform.translation.x = *target_moving_x;
-        //             moving_x = 0.0;
-        //
-        //             info!("end moving");
-        //         }
-        //     }
-        //
-        //     Direction::UP => {
-        //
-        //
-        //
-        //     }
-        //
-        //     Direction::NONE => {
-        //
-        //     }
-        // }
-
-        // match knight.moving_direction {
-        //     Direction::LEFT | Direction::RIGHT => {
-        //
-        //         if !*start_moving_x {
-        //             *start_moving_x = true;
-        //             *target_moving_x = BOARD_SIZE;
-        //             info!("start moving");
-        //         }
-        //
-        //         if *start_moving_x {
-        //
-        //             let last_target = *target_moving_x;
-        //
-        //             *target_moving_x -= moving_x.abs();
-        //
-        //             if *target_moving_x <= 0.0 {
-        //                 *start_moving_x = false;
-        //                 *target_moving_x = 0.0;
-        //                 moving_x = moving_x.signum() * last_target;
-        //                 knight.moving_direction = Direction::NONE;
-        //                 info!("left moving: {}", moving_x);
-        //             }
-        //         }
-        //     }
-        //     _ => {}
-        // }
-        //
-        // info!("translation X: {:?}", transform.translation.x);
 
         moving_y = knight.up_speed * delta;
         knight.up_speed += GRAVITY * delta * controller.custom_mass.unwrap_or(1.0);

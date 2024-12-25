@@ -2,8 +2,8 @@
 pub const BOARD_COUNT_X: i32 = 1;
 ///地板数量
 pub const BOARD_COUNT: i32 = 2 * BOARD_COUNT_X + 1;
-pub const BOARD_COUNT_Z: i32 = 48;
-pub const BOARD_Z_OFFSET: i32 = 8;
+pub const BOARD_COUNT_Z: i32 = 64;
+pub const BOARD_Z_OFFSET: i32 = 12;
 pub const BOARD_HEIGHT_RANDOM: f32 = 0.1f32;
 
 pub const MOVING_H_TIME:f32 = 0.1;
