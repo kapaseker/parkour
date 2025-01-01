@@ -6,16 +6,10 @@ pub struct AppWindowPlugin;
 
 impl Plugin for AppWindowPlugin {
     fn build(&self, app: &mut App) {
-        let window = if cfg!(debug_assertions) {
-            Window {
-                resolution: (1200.0, 1200.0).into(),
-                ..default()
-            }
-        } else {
-            Window {
-                mode: WindowMode::BorderlessFullscreen(MonitorSelection::Current),
-                ..default()
-            }
+
+        let window = Window {
+            mode: WindowMode::BorderlessFullscreen(MonitorSelection::Current),
+            ..default()
         };
 
         app.add_plugins(DefaultPlugins.set(WindowPlugin {

@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 bevy = { version = "0.15" }
+bevy_kira_audio = { version = "0.21", features = ["mp3","ogg"] }
 bevy_rapier3d = { version = "0.28", features = [ "simd-stable", "debug-render-3d"] }
 rand = "0.8"
 bevy_panorbit_camera = "0.21"
